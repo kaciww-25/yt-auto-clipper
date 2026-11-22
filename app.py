@@ -1,14 +1,46 @@
 import builtins as _builtins
+import io as _io
+from pathlib import Path as _Path
 
-_orig_open = _builtins.open
 
-
-def _safe_open(*args, **kwargs):
+def _strip_metadata_errors(kwargs: dict) -> dict:
     kwargs.pop("metadata_errors", None)
-    return _orig_open(*args, **kwargs)
+    return kwargs
 
 
-_builtins.open = _safe_open
+_orig_builtins_open = _builtins.open
+_orig_io_open = _io.open
+_orig_path_open = _Path.open
+
+
+def _safe_builtins_open(*args, **kwargs):
+    return _orig_builtins_open(*args, **_strip_metadata_errors(kwargs))
+
+
+def _safe_io_open(*args, **kwargs):
+    return _orig_io_open(*args, **_strip_metadata_errors(kwargs))
+
+
+def _safe_path_open(self, *args, **kwargs):
+    return _orig_path_open(self, *args, **_strip_metadata_errors(kwargs))
+
+
+_builtins.open = _safe_builtins_open
+_io.open = _safe_io_open
+_Path.open = _safe_path_open
+
+try:
+    import av as _av
+
+    _orig_av_open = _av.open
+
+    def _safe_av_open(*args, **kwargs):
+        kwargs.pop("metadata_errors", None)
+        return _orig_av_open(*args, **kwargs)
+
+    _av.open = _safe_av_open
+except ImportError:
+    pass
 
 import io
 import os
@@ -16,6 +48,7 @@ import re
 import json
 import zipfile
 import threading
+import traceback
 import webbrowser
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -1011,6 +1044,7 @@ class ClipMakerHandler(BaseHTTPRequestHandler):
             )
             self._send_json(200, {"clips": outputs})
         except Exception as exc:
+            traceback.print_exc()
             self._send_json(400, {"error": str(exc)})
         finally:
             _cleanup_cache(cache_dir)
@@ -1034,3 +1068,6 @@ def run_ui(host: str = "127.0.0.1", port: int = 7860) -> None:
 if __name__ == "__main__":
     run_ui()
     
+
+
+
